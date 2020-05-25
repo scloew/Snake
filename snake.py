@@ -1,44 +1,65 @@
 import curses
 from curses import KEY_DOWN, KEY_UP, KEY_LEFT, KEY_RIGHT
+from random import randint
 
 X_MAX = 135
 Y_MAX = 40
 X_MIN = 7
 Y_MIN = 3
+MAX_LENGTH = 60
 
+arrow = {
+  KEY_RIGHT: '>', KEY_LEFT: '<', KEY_UP: '^', KEY_DOWN: 'v'
+}
+
+pos_updates = {
+  KEY_RIGHT: (1, 0), KEY_LEFT: (-1, 0),
+  KEY_DOWN: (0, 1), KEY_UP: (0, -1)
+}
 
 def play_snake():
-
   screen = curses.initscr()
+  curses.resize_term(46, 150)
+  curses.curs_set(0)
   curses.noecho()
   screen.clear()
-  curses.resize_term(46, 150)
+  game_win, score_win = set_up_windows()
+  current_direction = active_key = KEY_RIGHT
+  update_pos = lambda cur_x, cur_y, update: (cur_x+update[0], cur_y+update[1])
+  x, y, escape = 65, 20, 27
+  snake, food, score = [(y, x)], (randint(Y_MIN+3, Y_MAX-3), randint(X_MIN+5, X_MAX-5)), 0
+  game_win.addstr(snake[-1][0], snake[-1][1], arrow[current_direction])
+  game_win.addstr(food[0], food[1], '*')
+  score_win.addstr(1, 1, f'SCORE: {score}')
+  score_win.refresh()
+  while active_key != escape:
+    current_direction = active_key if active_key in pos_updates.keys() else current_direction
+    x, y = update_pos(x, y, pos_updates[current_direction])
+    snake.append((y, x))
+    game_win.addstr(snake[-1][0], snake[-1][1], arrow[current_direction])
+    game_win.refresh()
+    game_win.addch(snake[0][0], snake[0][1], ' ')
+    if snake[-1] == food:
+      food = (randint(Y_MIN+3, Y_MAX-3), randint(X_MIN+5, X_MAX-5))
+      game_win.addstr(food[0], food[1], '*')
+      score += 100
+      score_win.addstr(1, 1, f'SCORE: {score}')
+      score_win.refresh()
+    elif snake[-1] != food or len(snake) > MAX_LENGTH:
+      snake.pop(0)
+    x, y = check_boundaries(x, y, current_direction)
+    active_key = game_win.getch()
+    curses.napms(100)
+
+
+def set_up_windows():
   game_win = curses.newwin(Y_MAX, X_MAX, Y_MIN-1, X_MIN-1)
+  score_win = curses.newwin(3, 10, 42, 65)
   game_win.box()
   game_win.keypad(True)
   game_win.refresh()
   game_win.timeout(00)
-  current_direction = active_key = KEY_RIGHT
-  pos_updates = {
-    KEY_RIGHT: (1, 0), KEY_LEFT: (-1, 0),
-    KEY_DOWN: (0, 1), KEY_UP: (0, -1)
-  }
-  update_pos = lambda cur_x, cur_y, update: (cur_x+update[0], cur_y+update[1])
-  snake = ['>']
-  x, y, escape = 65, 20, 27
-  game_win.addstr( y, x, snake[-1])
-  count = 0
-  game_win.addstr(y, x - count, '>')
-  while active_key != escape:
-    count += 1
-    game_win.addstr(35, 125, str((x, y)))
-    current_direction = active_key if active_key in pos_updates.keys() else current_direction
-    x, y = update_pos(x, y, pos_updates[current_direction])
-    game_win.addstr(y, x, snake[-1])
-    x, y = check_boundaries(x, y, current_direction)
-    game_win.refresh()
-    active_key = game_win.getch()
-    curses.napms(100)
+  return game_win, score_win
 
 
 def check_boundaries(x, y, current_direction):
